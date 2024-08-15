@@ -1,10 +1,13 @@
 name: shiny
-title:
+title: PRCApp
 username: cdyzh
 account: cdyzh
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 12296771
-bundleId: 8905454
+bundleId: 8985724
 url: https://cdyzh.shinyapps.io/shiny/
 version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: preprocessed_full.csv
