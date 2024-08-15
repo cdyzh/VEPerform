@@ -1,0 +1,10 @@
+name: shiny
+title:
+username: cdyzh
+account: cdyzh
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12296771
+bundleId: 8905454
+url: https://cdyzh.shinyapps.io/shiny/
+version: 1

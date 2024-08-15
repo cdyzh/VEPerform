@@ -1,0 +1,53 @@
+---
+title: "PRC Report"
+output: pdf_document
+params:
+  gene_s: NA
+  selected_scores: NA
+  B_org: NA
+  P_org: NA
+  prcfiltered: NA
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(yogiroc)
+library(knitr)
+```
+
+## Plot
+
+```{r prc-plot, fig.cap="Precision-Recall Curve", echo=FALSE, results='asis', fig.width=7, fig.height=7}
+# Create the PRC plot based on the provided parameters
+draw.prc(yr2(
+  truth = params$prcfiltered$classification, 
+  scores = params$prcfiltered[params$selected_scores], 
+  high = rep(FALSE, length(params$selected_scores))
+), 
+lty = c("dashed", "solid", "dashed")[1:length(params$selected_scores)], 
+col = c("purple", "cadetblue2", "orange")[1:length(params$selected_scores)], 
+lwd = 2, 
+balanced = TRUE, 
+main = paste0(params$gene_s, " PRCs for ", paste(params$selected_scores, collapse = ", "))
+)
+abline(h = 90, lty = "dashed")
+legend("left", legend = c(paste("# of Pathogenic and Likely Pathogenic:", params$P_org), paste("# of Benign and Likely Benign:", params$B_org)), pch = 15, bty = "n")
+
+```
+
+
+### Summary of Selected Options
+
+- **Gene**: `r params$gene_s`
+- **Selected Scores**: `r paste(params$selected_scores, collapse = ", ")`
+- **Number of Pathogenic and Likely Pathogenic Variants**: `r params$P_org`
+- **Number of Benign and Likely Benign Variants**: `r params$B_org`
+
+### Data Used
+
+```{r pressure, echo=FALSE}
+# Display the filtered data used for the PRC calculation
+knitr::kable(params$prcfiltered, col.names = c("Gene", "Variant_ID", "gnomAD_AF", "VARITY", "REVEL", "AlphaMissense", "Classification"), caption = "Filtered Data Used for PRC Calculation (Classification TRUE = Benign, FALSE = Pathogenic)")
+```
+
+
