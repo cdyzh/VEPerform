@@ -36,4 +36,4 @@
 - Download plots and associated data for further analysis or reporting.
 
 ## Installation
-- This is currently a Web App at https://cdyzh.shinyapps.io/veperform/. To run your own, clone this repository and extract full.csv from its folder. 
+- This is currently a Web App at https://cdyzh.shinyapps.io/veperform/. To run your own, clone this repository and extract full.csv from its folder. The package "yogiroc" is installed using remotes::install_github("cdyzh/yogiroc").
