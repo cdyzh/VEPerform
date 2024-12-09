@@ -121,14 +121,14 @@ server <- function(input, output, session) {
           selected_df <- selected_df[order(selected_df$clinvar), ]
           
           # Convert label to T/F
-          selected_df <- selected_df %>% mutate(clinvar = ifelse(clinvar == "B/LB", TRUE, FALSE))
+          selected_df <- selected_df %>% mutate(clinvar = ifelse(clinvar == "P/LP", TRUE, FALSE))
           
           # Count # of P and B
-          B_org <- sum(selected_df$clinvar == TRUE & rowSums(!is.na(selected_df[selected_scores])) > 0)
-          P_org <- sum(selected_df$clinvar == FALSE & rowSums(!is.na(selected_df[selected_scores])) > 0)
+          P_org <- sum(selected_df$clinvar == TRUE & rowSums(!is.na(selected_df[selected_scores])) > 0)
+          B_org <- sum(selected_df$clinvar == FALSE & rowSums(!is.na(selected_df[selected_scores])) > 0)
           
           tryCatch({
-            yrobj <- yr2(truth = selected_df[["clinvar"]], scores = selected_df[selected_scores], high = rep(FALSE, length(selected_scores)))
+            yrobj <- yr2(truth = selected_df[["clinvar"]], scores = selected_df[selected_scores], high = rep(TRUE, length(selected_scores)))
             
             plot_data(list(
               yrobj = yrobj,
@@ -628,15 +628,15 @@ server <- function(input, output, session) {
         
         prcfiltered <- df %>%
           filter(rowSums(!is.na(df[selected_scores])) > 0) %>%
-          mutate(clinvar = ifelse(clinvar == "B/LB", TRUE, ifelse(clinvar == "P/LP", FALSE, NA)))
+          mutate(clinvar = ifelse(clinvar == "P/LP", TRUE, ifelse(clinvar == "B/LB", FALSE, NA)))
         
         prcfiltered <- prcfiltered[!is.na(prcfiltered$clinvar), ]
         
-        B_org <- sum(prcfiltered$clinvar == TRUE)
-        P_org <- sum(prcfiltered$clinvar == FALSE)
+        P_org <- sum(prcfiltered$clinvar == TRUE)
+        B_org <- sum(prcfiltered$clinvar == FALSE)
         
         tryCatch({
-          yrobj <- yr2(truth = prcfiltered[["clinvar"]], scores = prcfiltered[selected_scores], high = rep(FALSE, length(selected_scores)))
+          yrobj <- yr2(truth = prcfiltered[["clinvar"]], scores = prcfiltered[selected_scores], high = rep(TRUE, length(selected_scores)))
           
           # Extra colors for lines more than 3
           # Exclude white and near-white colors
