@@ -23,7 +23,7 @@ library(knitr)
 draw.prc(yr2(
   truth = params$prcfiltered$clinvar, 
   scores = params$prcfiltered[params$selected_scores], 
-  high = rep(FALSE, length(params$selected_scores))
+  high = rep(TRUE, length(params$selected_scores))
 ), 
 lty = c("dashed", "solid", "dashed")[1:length(params$selected_scores)], 
 col = c("purple", "cadetblue2", "orange")[1:length(params$selected_scores)], 
@@ -50,7 +50,7 @@ legend("left", legend = c(paste("# of Pathogenic and Likely Pathogenic:", params
 ```{r pressure, echo=FALSE}
 # Display the filtered data used for the PRC calculation
 display_df <- params$prcfiltered %>%
-  dplyr::mutate(clinvar = ifelse(clinvar == TRUE, "B/LB", "P/LP")) %>%
+  dplyr::mutate(clinvar = ifelse(clinvar == TRUE, "P/LP", "B/LB")) %>%
   dplyr::select(params$display_df, base__achange, gnomAD_AF, VARITY, REVEL, AlphaMissense, clinvar, stars)
 
 knitr::kable(

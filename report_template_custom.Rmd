@@ -42,7 +42,7 @@ draw.prc(
   yr2(
     truth = params$prcfiltered$clinvar, 
     scores = params$prcfiltered[params$selected_scores], 
-    high = rep(FALSE, num_scores)), 
+    high = rep(TRUE, num_scores)), 
   lty = lty_styles,
   col = col_styles,
   lwd = 2,
@@ -75,7 +75,7 @@ legend(
 ```{r pressure, echo=FALSE, results='asis'}
 # Display the filtered data used for the PRC calculation with dynamic columns
 display_df <- params$prcfiltered %>%
-  dplyr::mutate(clinvar = ifelse(clinvar == TRUE, "B/LB", "P/LP")) %>%
+  dplyr::mutate(clinvar = ifelse(clinvar == TRUE, "P/LP", "B/LB")) %>%
   dplyr::select(-dplyr::any_of(c("chrom", "pos", "ref_base", "alt_base", "base__gene"))) # Condenses the table
 
 num_columns <- ncol(display_df)

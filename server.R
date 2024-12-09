@@ -795,7 +795,7 @@ server <- function(input, output, session) {
           if (!is.null(plot_info) && !is.null(plot_info$prcfiltered) && nrow(plot_info$prcfiltered) > 0) {
             prcfiltered <- plot_info$prcfiltered
             prcfiltered <- prcfiltered %>%
-              mutate(clinvar = ifelse(clinvar == TRUE, "B/LB", "P/LP"))
+              mutate(clinvar = ifelse(clinvar == TRUE, "P/LP", "B/LB"))
             write.csv(prcfiltered, file, row.names = FALSE)
           }
         }
