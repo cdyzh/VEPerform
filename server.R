@@ -14,6 +14,7 @@ library(DT)
 server <- function(input, output, session) {
   plot_data <- reactiveVal(NULL)
   selected_variants <- reactiveVal(NULL)  # Store user-selected variants
+  threshold_data <- reactiveVal(NULL) # for storing PRC thresholds - REFACTOR: include as part of prc data? - jumptag
   
   # Giant if/else block to handle separate logic for Main App and Advanced
   observe({
@@ -33,25 +34,43 @@ server <- function(input, output, session) {
         }
       })
       
-      # Update scores - if a VEP is all NA, checkbox will not show up
+      # Update scores - show only if a predictor has at least 1 P/LP and 1 B/LB
       observe({
         req(input$Main_gene)
+        
+        # Fetch filtered data for the selected gene
         df <- prcdata()
         gene_data <- df %>% filter(base__gene == input$Main_gene)
         
+        # Initialize available scores list
         available_scores <- c()
-        if (any(!is.na(gene_data$varity_r))) {
-          available_scores <- c(available_scores, "VARITY")
-        }
-        if (any(!is.na(gene_data$alphamissense__pathogenicity))) {
-          available_scores <- c(available_scores, "AlphaMissense")
-        }
-        if (any(!is.na(gene_data$revel__score))) {
-          available_scores <- c(available_scores, "REVEL")
+        
+        # Check each score for the required condition
+        if (any(!is.na(gene_data$VEP_varity_r))) {
+          if (any(gene_data$clinvar == "P/LP" & !is.na(gene_data$VEP_varity_r)) &&
+              any(gene_data$clinvar == "B/LB" & !is.na(gene_data$VEP_varity_r))) {
+            available_scores <- c(available_scores, "VARITY")
+          }
         }
         
+        if (any(!is.na(gene_data$VEP_alphamissense__pathogenicity))) {
+          if (any(gene_data$clinvar == "P/LP" & !is.na(gene_data$VEP_alphamissense__pathogenicity)) && 
+              any(gene_data$clinvar == "B/LB" & !is.na(gene_data$VEP_alphamissense__pathogenicity))) {
+            available_scores <- c(available_scores, "AlphaMissense")
+          }
+        }
+        
+        if (any(!is.na(gene_data$VEP_revel__score))) {
+          if (any(gene_data$clinvar == "P/LP" & !is.na(gene_data$VEP_revel__score)) && 
+              any(gene_data$clinvar == "B/LB" & !is.na(gene_data$VEP_revel__score))) {
+            available_scores <- c(available_scores, "REVEL")
+          }
+        }
+        
+        # Update the checkbox group input with valid predictors
         updateCheckboxGroupInput(session, "Main_scores", choices = available_scores, selected = available_scores)
       })
+      
       
       # Show variant selection display
       showVariantSelectionModal <- function(df, gene_selected) {
@@ -120,15 +139,25 @@ server <- function(input, output, session) {
           
           selected_df <- selected_df[order(selected_df$clinvar), ]
           
+          # Filter out any rows with an NA in any `selected_scores`
+          selected_df <- selected_df[rowSums(is.na(selected_df[selected_scores])) == 0, ]
+          
           # Convert label to T/F
           selected_df <- selected_df %>% mutate(clinvar = ifelse(clinvar == "P/LP", TRUE, FALSE))
           
           # Count # of P and B
-          P_org <- sum(selected_df$clinvar == TRUE & rowSums(!is.na(selected_df[selected_scores])) > 0)
-          B_org <- sum(selected_df$clinvar == FALSE & rowSums(!is.na(selected_df[selected_scores])) > 0)
+          P_org <- sum(selected_df$clinvar == TRUE)
+          B_org <- sum(selected_df$clinvar == FALSE)
           
           tryCatch({
             yrobj <- yr2(truth = selected_df[["clinvar"]], scores = selected_df[selected_scores], high = rep(TRUE, length(selected_scores)))
+            
+            # Added for threshold calculation - jumptag
+            thresh_ranges <- calculate_thresh_range(yrobj, x = 0.9, balanced = TRUE)
+            
+            # Store thresholds for rendering
+            threshold_data(thresh_ranges)
+            # end thresholds
             
             plot_data(list(
               yrobj = yrobj,
@@ -167,7 +196,44 @@ server <- function(input, output, session) {
             }
           }, width = 600, height = 600, res = 72)
           
+          # Render the threshold table - jumptag
+          output$thresholdTableUI <- renderUI({
+            req(threshold_data())
+            
+            tagList(
+              h5("VEP threshold to achieve 90% Balanced Precision"),  # Add the title only if the table exists
+              tableOutput("thresholdTable")  
+            )
+          })
+          
+          output$thresholdTable <- renderTable({
+            req(threshold_data())
+            
+            df <- threshold_data()
+            
+            # Round numeric columns to 3 decimals if numeric
+            df <- as.data.frame(lapply(df, function(x) {
+              if (is.numeric(x)) {
+                format(round(x, 3), nsmall = 3)
+              } else {
+                x
+              }
+            }))
+            df
+          }, rownames = FALSE)
+          
           removeModal()  # Close the modal after the user clicks "OK"
+          
+          if (P_org < 11 || B_org < 11) {
+            showModal(modalDialog(
+              title = "Warning",
+              "There are fewer than 11 Pathogenic/Likely Pathogenic or Benign/Likely Benign variants. 
+           Please use extra caution when interpreting these plots.",
+              easyClose = TRUE,
+              footer = modalButton("Close")
+            ))
+          }
+          
         } else {
           showModal(modalDialog(
             title = "Error",
@@ -295,7 +361,6 @@ server <- function(input, output, session) {
         ))
       })
       
-      
     } else {
       # Logic for Advanced
       rv <- reactiveValues(
@@ -313,7 +378,7 @@ server <- function(input, output, session) {
         rv$plot_data(NULL)
         rv$prcdata_fetch(NULL)
         rv$prcdata_own(NULL)
-        rv$state$gnomad_filter_inserted <- FALSE
+        rv$gnomad_filter_inserted <- FALSE
         
         updateCheckboxGroupInput(session, "scores", choices = NULL, selected = NULL)
         removeUI(selector = "#gnomad_filter_wrapper", immediate = TRUE)
@@ -432,7 +497,7 @@ server <- function(input, output, session) {
                 )
                 
                 response <- GET(api_url)
-
+                
                 result <- fromJSON(content(response, "text"), flatten = TRUE)
                 
                 # Extract gene and achange into corresponding columns
@@ -535,13 +600,13 @@ server <- function(input, output, session) {
             
             # Combine all results into a data frame
             variant_data_df <- do.call(rbind, all_results)
-
+            
             variant_data_df <- dplyr::left_join(df, variant_data_df, by = c("chrom", "pos", "ref_base", "alt_base"))
             
             output$errorText <- renderText("")
             rv$prcdata_fetch(variant_data_df)  # Set the reactiveVal
             rv$variant_data_df <- variant_data_df
-            print(variant_data_df) # DEBUG
+            
           }, error = function(e) {
             showModal(modalDialog(
               title = "Error",
@@ -576,7 +641,7 @@ server <- function(input, output, session) {
         gnomad_columns <- grep("gnomad", colnames_lower, value = TRUE)
         
         # If gnomAD columns are found and the checkbox is not yet added
-        if (length(gnomad_columns) > 0 && !rv$state$gnomad_filter_inserted) {
+        if (length(gnomad_columns) > 0 && isFALSE(rv$gnomad_filter_inserted)) {
           # Remove any existing checkbox to prevent duplicates
           removeUI(selector = "#gnomad_filter_wrapper", immediate = TRUE)
           
@@ -590,12 +655,12 @@ server <- function(input, output, session) {
                                    value = TRUE)
             )
           )
-          rv$state$gnomad_filter_inserted <- TRUE
+          rv$gnomad_filter_inserted <- TRUE
           
-        } else if (length(gnomad_columns) == 0 && rv$state$gnomad_filter_inserted) {
-          # Remove the checkbox if no gnomAD columns are found and it’s currently inserted
+        } else if (length(gnomad_columns) == 0 && isTRUE(rv$gnomad_filter_inserted)) {
+          # Remove the checkbox if no gnomAD columns are found and it is still there
           removeUI(selector = "#gnomad_filter_wrapper", immediate = TRUE)
-          rv$state$gnomad_filter_inserted <- FALSE
+          rv$gnomad_filter_inserted <- FALSE
         }
         
         # Remove "VEP_" prefix from predictor column names for display
@@ -616,8 +681,8 @@ server <- function(input, output, session) {
         gene_s <- ifelse("base__gene" %in% colnames(df), df$base__gene[1], "Custom Gene")
         exclude_common_variants <- input$common_variant_filter
         selected_scores <- input$scores
-
-        if (exclude_common_variants && "gnomAD_AF" %in% colnames(df)) {
+        
+        if (isTRUE(exclude_common_variants) && "gnomAD_AF" %in% colnames(df)) { # walktag - added isTRUE
           df <- df[is.na(df$gnomAD_AF) | df$gnomAD_AF <= 0.005, ]
         }
         
@@ -632,6 +697,10 @@ server <- function(input, output, session) {
         
         prcfiltered <- prcfiltered[!is.na(prcfiltered$clinvar), ]
         
+        # Filter out any rows with an NA in any `selected_scores`
+        prcfiltered <- prcfiltered[rowSums(is.na(prcfiltered[selected_scores])) == 0, ]
+        
+        # Count # of P and B
         P_org <- sum(prcfiltered$clinvar == TRUE)
         B_org <- sum(prcfiltered$clinvar == FALSE)
         
@@ -696,6 +765,17 @@ server <- function(input, output, session) {
             })
           }
         }, width = 600, height = 600, res = 72)
+        
+        if (P_org < 11 || B_org < 11) {
+          showModal(modalDialog(
+            title = "Warning",
+            "There are fewer than 11 Pathogenic/Likely Pathogenic or Benign/Likely Benign variants. 
+           Please use extra caution when interpreting these plots.",
+            easyClose = TRUE,
+            footer = modalButton("Close")
+          ))
+        }
+        
       })
       
       # Download logic 

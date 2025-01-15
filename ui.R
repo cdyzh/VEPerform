@@ -66,6 +66,7 @@ ui <- fluidPage(
                  ),
                  mainPanel(
                    plotOutput("Main_PRCPlot", width = "600px", height = "600px"),
+                   uiOutput("thresholdTableUI"), # jumptag
                    textOutput("Main_ErrorText")
                  )
                )
